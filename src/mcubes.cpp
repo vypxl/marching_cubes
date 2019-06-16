@@ -24,6 +24,7 @@ void MCubes::draw() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // TODO fix flickering
+    // TODO controllable camera
 
     // draw status text
     char buf[128];
@@ -32,9 +33,9 @@ void MCubes::draw() {
 
     // draw marching cubes
     const int distance = 15;
-    mView = glm::lookAt(glm::vec3(sin(angle) * distance, distance * 3 / 5, cos(angle) * distance), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-    /* glm::mat4 view = glm::lookAt(glm::vec3(distance, distance * 3 / 5, distance), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0)); */
-    mMVP = mProjection * mView * mModel;
+    cam.moveTo(glm::vec3(sin(angle) * distance, distance * 3 / 5, cos(angle) * distance));
+    cam.lookAt(glm::vec3(0, 0, 0));
+    glm::mat4 mMVP = cam.getMVP(); // mProjection * mView * mModel;
 
     mCubesShader.bind();
 
@@ -148,9 +149,8 @@ int MCubes::init() {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R8I, 15, 256, 0, GL_RED_INTEGER, GL_BYTE, (GLint*)triTable);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    // set up projection and model matrices
-    mProjection = glm::perspective(glm::radians(45.f), (float) width / (float) height, 0.1f, 100.f);
-    mModel = glm::mat4(1.f);
+    // set up camera
+    cam.setProjection(45, width, height);
 
     mcubes_attr_pos = mCubesShader.getAttribLocation("position");
     cube_attr_pos = cubeShader.getAttribLocation("position");

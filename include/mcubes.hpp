@@ -5,6 +5,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "glapp.hpp"
+#include "camera.hpp"
 
 class MCubes : public GlApp {
 
@@ -22,10 +23,7 @@ class MCubes : public GlApp {
     GLuint points_vbo;
     GLuint cube_ebo;
 
-    glm::mat4 mProjection;
-    glm::mat4 mView;
-    glm::mat4 mModel;
-    glm::mat4 mMVP;
+    Camera cam;
 
     Uint32 last_timer = 0;
     double delta = 0;
