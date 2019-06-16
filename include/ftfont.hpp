@@ -17,7 +17,7 @@
 class FtFont {
 private:
     struct Character {
-        GLuint texID;
+        float x, y;
         unsigned int w, h;
         int bearingX, bearingY;
         long int advance;
@@ -26,6 +26,7 @@ private:
 
     Shader shader;
     GLuint attr_pos;
+    GLuint texID;
 
     GLuint vao;
     GLuint vbo;
