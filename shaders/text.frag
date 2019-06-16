@@ -9,5 +9,5 @@ in vec2 uv;
 uniform sampler2D tex;
 
 void main() {
-    color = vec4(1.0, 1.0, 1.0, texture(tex, uv).a);
+    color = vec4(1.0, 1.0, 1.0, texture(tex, uv / vec2(1024, 1024)).a);
 }
