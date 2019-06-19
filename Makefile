@@ -1,5 +1,5 @@
 NAME=glapp
-LIBS=-lGL -lGLEW -lSDL -lfreetype
+LIBS=-lGL -lGLEW -lSDL2 -lfreetype
 
 CXX_OPTS=-I include -o out/$(NAME)
 

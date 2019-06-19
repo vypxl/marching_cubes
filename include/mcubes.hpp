@@ -9,6 +9,13 @@
 
 class MCubes : public GlApp {
 
+    float camSpeed = 5.0;
+    float camRX = 0;
+    float camRY = 0;
+
+    SDL_GLContext glcontext;
+    SDL_Window *window;
+
     Shader mCubesShader;
     Shader cubeShader;
     FtFont* font;
@@ -27,11 +34,12 @@ class MCubes : public GlApp {
 
     Uint32 last_timer = 0;
     double delta = 0;
+    bool mouseCaptured = false;
 
     float surface = 3;
     float angle = 0;
 
-    bool drawBoxOutline = false;
+    bool drawBoxOutline = true;
 
     static const uint points_count = 125;
     float points[points_count][3];

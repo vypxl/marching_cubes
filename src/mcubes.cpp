@@ -13,18 +13,37 @@ void MCubes::update() {
     // update view angle
     angle = std::fmod(angle + ((M_PI / 3) * delta), M_PI * 2);
 
-    // update surface level according to mouse position on screen
-    int mouseY;
-    SDL_GetMouseState(nullptr, &mouseY);
-    const double range = 20;
-    surface = -((((double) mouseY) / ((double) height)) * range - (range / 2.0));
+    // process input
+    const Uint8 *keyState = SDL_GetKeyboardState(nullptr);
+    glm::vec3 movement(0.f, 0.f, 0.f);
+
+    if (keyState[SDL_SCANCODE_S])      movement += glm::vec3(-camSpeed * delta * cos(camRX), 0.f, -camSpeed * delta * sin(camRX));
+    if (keyState[SDL_SCANCODE_W])      movement += glm::vec3( camSpeed * delta * cos(camRX), 0.f,  camSpeed * delta * sin(camRX));
+    if (keyState[SDL_SCANCODE_SPACE])  movement += glm::vec3(0.f, camSpeed * delta, 0.f);
+    if (keyState[SDL_SCANCODE_LSHIFT]) movement += glm::vec3(0.f, -camSpeed * delta, 0.f);
+    if (keyState[SDL_SCANCODE_A])      movement += glm::vec3(-camSpeed * delta * cos(camRX + M_PI_2), 0.f, -camSpeed * delta * sin(camRX + M_PI_2));
+    if (keyState[SDL_SCANCODE_D])      movement += glm::vec3(-camSpeed * delta * cos(camRX - M_PI_2), 0.f, -camSpeed * delta * sin(camRX - M_PI_2));
+    if (keyState[SDL_SCANCODE_LCTRL])  movement *= 3.f;
+
+    cam.move(movement);
+
+    // update camera rotation
+    int mouseX, mouseY;
+    SDL_GetRelativeMouseState(&mouseX, &mouseY);
+
+    const float mouseSensivity = 0.1f;
+    camRX += glm::radians(mouseX * mouseSensivity);
+    camRY -= glm::radians(mouseY * mouseSensivity);
+    const float max_angle = 1.57079;
+    if (camRY > max_angle)  camRY = max_angle;
+    if (camRY < -max_angle) camRY = -max_angle;
+
+    cam.setRotation(camRX, camRY);
+    std::cout << glm::degrees(camRX) << " | " << glm::degrees(camRY) << std::endl;
 }
 
 void MCubes::draw() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // TODO fix flickering
-    // TODO controllable camera
 
     // draw status text
     char buf[128];
@@ -33,9 +52,7 @@ void MCubes::draw() {
 
     // draw marching cubes
     const int distance = 15;
-    cam.moveTo(glm::vec3(sin(angle) * distance, distance * 3 / 5, cos(angle) * distance));
-    cam.lookAt(glm::vec3(0, 0, 0));
-    glm::mat4 mMVP = cam.getMVP(); // mProjection * mView * mModel;
+    glm::mat4 mMVP = cam.getMVP();
 
     mCubesShader.bind();
 
@@ -60,7 +77,7 @@ void MCubes::draw() {
 
     glBindVertexArray(0);
 
-    SDL_GL_SwapBuffers();
+    SDL_GL_SwapWindow(window);
 }
 
 void MCubes::cleanup() {
@@ -70,28 +87,13 @@ void MCubes::cleanup() {
 
 int MCubes::init() {
     // Initialize SDL
-    const SDL_VideoInfo* info = nullptr;
     int width = 1920;
     int height = 1080;
-
-    if(SDL_Init(SDL_INIT_VIDEO) < 0) {
-        std::cerr << "Video initialization failed: " << SDL_GetError() << std::endl;
-        return 1;
-    }
-
-    info = SDL_GetVideoInfo( );
-    if(!info) {
-        std::cerr << "Video query failed: " << SDL_GetError() << std::endl;
-        return 1;
-    }
+    window = SDL_CreateWindow("Marching cubes", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_MOUSE_CAPTURE);
+    glcontext = SDL_GL_CreateContext(window);
 
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
-
-    if(SDL_SetVideoMode(width, height, 0, SDL_OPENGL | SDL_NOFRAME) == 0) {
-        std::cerr << "Video mode set failed: " << SDL_GetError() << std::endl;
-        return 1;
-    }
 
     // Initialize glew
     if (glewInit() != GLEW_OK) {
@@ -151,10 +153,14 @@ int MCubes::init() {
 
     // set up camera
     cam.setProjection(45, width, height);
+    cam.moveTo(glm::vec3(15.f, 5.f, 15.f));
+    cam.moveTo(glm::vec3(0.5f,0.5f,0.5f));
 
+    // set up attribute locations
     mcubes_attr_pos = mCubesShader.getAttribLocation("position");
     cube_attr_pos = cubeShader.getAttribLocation("position");
 
+    // set up vaos
     glBindVertexArray(mcubes_vao);
 
       glBindBuffer(GL_ARRAY_BUFFER, points_vbo);
@@ -179,20 +185,15 @@ int MCubes::init() {
 }
 
 void MCubes::mainloop() {
-    SDL_Event event;
+    update();
 
+    SDL_Event event;
     while(SDL_PollEvent(&event)) {
         switch(event.type) {
         case SDL_KEYDOWN:
             switch (event.key.keysym.sym) {
                 case SDLK_q:
                     running = false;
-                    break;
-                case SDLK_UP:
-                    surface += 0.5f;
-                    break;
-                case SDLK_DOWN:
-                    surface -= 0.5f;
                     break;
                 case SDLK_r:
                     mCubesShader.loadFromFile("shaders/mcubes.vert", "shaders/mcubes.geom", "shaders/mcubes.frag");
@@ -204,16 +205,10 @@ void MCubes::mainloop() {
         case SDL_QUIT:
             running = false;
             break;
-        case SDL_VIDEORESIZE:
+        case SDL_WINDOWEVENT_RESIZED:
             // set instance members
-            width = event.resize.w;
-            height = event.resize.h;
-
-            // set sdl videomode
-            if(SDL_SetVideoMode(width, height, 0, SDL_OPENGL | SDL_NOFRAME) == 0) {
-                std::cerr << "Video mode set failed: " << SDL_GetError() << std::endl;
-                exit(1);
-            }
+            width = event.window.data1;
+            height = event.window.data2;
 
             // set gl viewport
             glViewport(0, 0, width, height);
@@ -221,9 +216,13 @@ void MCubes::mainloop() {
             // set font projection
             font->setWindow(width, height);
             break;
+        case SDL_MOUSEBUTTONDOWN:
+            if (event.button.button == SDL_BUTTON_RIGHT) {
+              mouseCaptured = !mouseCaptured;
+              SDL_SetRelativeMouseMode((SDL_bool)mouseCaptured);
+            }
         }
     }
 
-    update();
     draw();
 }

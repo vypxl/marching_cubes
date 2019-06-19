@@ -6,7 +6,7 @@
 #else
     #include <GL/glew.h>
 #endif
-#include <SDL/SDL.h>
+#include <SDL2/SDL.h>
 
 #include "shader.hpp"
 #include "ftfont.hpp"
