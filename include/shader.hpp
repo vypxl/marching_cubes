@@ -24,7 +24,7 @@ public:
     GLuint getAttribLocation(const std::string &name);
     ~Shader();
 
-    GLuint prog;
+    GLuint prog = 0;
 
     int loadFromFile(const std::string &vertexShaderFilename, const std::string &geometryShaderFilename, const std::string &fragmenShaderFilename);
     void bind();

@@ -6,6 +6,7 @@
 
 #include "glapp.hpp"
 #include "camera.hpp"
+#include "chunk.hpp"
 
 class MCubes : public GlApp {
 
@@ -16,19 +17,9 @@ class MCubes : public GlApp {
     SDL_GLContext glcontext;
     SDL_Window *window;
 
-    Shader mCubesShader;
-    Shader cubeShader;
     FtFont* font;
 
-    GLuint mcubes_attr_pos;
-    GLuint cube_attr_pos;
-
-    GLuint triTableTex;
-
-    GLuint mcubes_vao;
-    GLuint cube_vao;
-    GLuint points_vbo;
-    GLuint cube_ebo;
+    ChunkManager chunkManager;
 
     Camera cam;
 
@@ -36,13 +27,7 @@ class MCubes : public GlApp {
     double delta = 0;
     bool mouseCaptured = false;
 
-    float surface = 3;
-    float angle = 0;
-
-    bool drawBoxOutline = true;
-
-    static const uint points_count = 125;
-    float points[points_count][3];
+    float surface = 0;
 
     void update();
     void draw() ;

@@ -1,7 +1,8 @@
 NAME=glapp
 LIBS=-lGL -lGLEW -lSDL2 -lfreetype
 
-CXX_OPTS=-I include -o out/$(NAME)
+CXX_OPTS=-std=c++17 -I include -o out/$(NAME)
+DEBUG_OPTS=-ggdb
 
 FILES=$(wildcard src/*.cpp) $(wildcard src/sorts/*.cpp)
 
@@ -11,7 +12,10 @@ mkdirs:
 	@mkdir -p out/web
 
 build: mkdirs
-	@g++ -I include -o out/$(NAME) $(FILES) $(LIBS)
+	@g++ $(CXX_OPTS) $(FILES) $(LIBS)
+
+build_debug: mkdirs
+	@g++ $(CXX_OPTS) $(DEBUG_OPTS) $(FILES) $(LIBS)
 
 run: build
 	@out/$(NAME)

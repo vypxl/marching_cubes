@@ -11,7 +11,7 @@ void MCubes::update() {
     last_timer = SDL_GetTicks();
 
     // update view angle
-    angle = std::fmod(angle + ((M_PI / 3) * delta), M_PI * 2);
+    /* angle = std::fmod(angle + ((M_PI / 3) * delta), M_PI * 2); */
 
     // process input
     const Uint8 *keyState = SDL_GetKeyboardState(nullptr);
@@ -27,19 +27,20 @@ void MCubes::update() {
 
     cam.move(movement);
 
+
     // update camera rotation
     int mouseX, mouseY;
     SDL_GetRelativeMouseState(&mouseX, &mouseY);
+    if (mouseCaptured) {
+        const float mouseSensivity = 0.1f;
+        camRX += glm::radians(mouseX * mouseSensivity);
+        camRY -= glm::radians(mouseY * mouseSensivity);
+        const float max_angle = 1.57079;
+        if (camRY > max_angle)  camRY = max_angle;
+        if (camRY < -max_angle) camRY = -max_angle;
 
-    const float mouseSensivity = 0.1f;
-    camRX += glm::radians(mouseX * mouseSensivity);
-    camRY -= glm::radians(mouseY * mouseSensivity);
-    const float max_angle = 1.57079;
-    if (camRY > max_angle)  camRY = max_angle;
-    if (camRY < -max_angle) camRY = -max_angle;
-
-    cam.setRotation(camRX, camRY);
-    std::cout << glm::degrees(camRX) << " | " << glm::degrees(camRY) << std::endl;
+        cam.setRotation(camRX, camRY);
+    }
 }
 
 void MCubes::draw() {
@@ -51,37 +52,13 @@ void MCubes::draw() {
     font->renderText(buf, 10, height - 26, 1.f);
 
     // draw marching cubes
-    const int distance = 15;
     glm::mat4 mMVP = cam.getMVP();
-
-    mCubesShader.bind();
-
-    mCubesShader.setUniform("MVP", mMVP);
-    mCubesShader.setUniform("triTable", 0);
-    mCubesShader.setUniform("surface", surface);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, triTableTex);
-
-    glBindVertexArray(mcubes_vao);
-    glDrawArrays(GL_POINTS, 0, points_count);
-
-    // draw box outlines if enabled
-    if (drawBoxOutline) {
-      cubeShader.bind();
-      cubeShader.setUniform("MVP", mMVP);
-
-      glBindVertexArray(cube_vao);
-      glDrawArrays(GL_POINTS, 0, points_count);
-    }
-
-    glBindVertexArray(0);
+    chunkManager.render(&cam);
 
     SDL_GL_SwapWindow(window);
 }
 
 void MCubes::cleanup() {
-    glDeleteTextures(1, &triTableTex);
     delete font;
 }
 
@@ -89,7 +66,12 @@ int MCubes::init() {
     // Initialize SDL
     int width = 1920;
     int height = 1080;
-    window = SDL_CreateWindow("Marching cubes", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_MOUSE_CAPTURE);
+    window = SDL_CreateWindow(
+        "Marching cubes",
+        SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+        width, height,
+        SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS | SDL_WINDOW_MOUSE_CAPTURE
+      );
     glcontext = SDL_GL_CreateContext(window);
 
     SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
@@ -115,71 +97,13 @@ int MCubes::init() {
     // Initialize font
     font = new FtFont("res/RobotoMono-Regular.ttf", 16, width, height);
 
-    // Initialize shaders
-    mCubesShader.loadFromFile("shaders/mcubes.vert", "shaders/mcubes.geom", "shaders/mcubes.frag");
-    cubeShader.loadFromFile("shaders/cubes.vert", "shaders/cubes.geom", "shaders/cubes.frag");
-
-    // Initialize Buffers
-    glGenVertexArrays(1, &mcubes_vao);
-    glGenVertexArrays(1, &cube_vao);
-    glGenBuffers(1, &points_vbo);
-
-    // Initialize points
-    const int limit = std::cbrt(points_count);
-    for (float i = 0; i < limit; i++)
-      for (float j = 0; j < limit; j++)
-        for (float k = 0; k < limit; k++) {
-          const int idx = i * limit * limit + j * limit + k;
-          points[idx][0] = i;
-          points[idx][1] = j;
-          points[idx][2] = k;
-        }
-
-    glBindBuffer(GL_ARRAY_BUFFER, points_vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(points), points, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    // Set up triTable texture
-    glGenTextures(1, &triTableTex);
-    glBindTexture(GL_TEXTURE_2D, triTableTex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8I, 15, 256, 0, GL_RED_INTEGER, GL_BYTE, (GLint*)triTable);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
     // set up camera
     cam.setProjection(45, width, height);
-    cam.moveTo(glm::vec3(15.f, 5.f, 15.f));
-    cam.moveTo(glm::vec3(0.5f,0.5f,0.5f));
+    cam.moveTo(glm::vec3(-1.f, 2.f, -1.f));
+    cam.lookAt(glm::vec3(1.f, 0.f, 1.f));
 
-    // set up attribute locations
-    mcubes_attr_pos = mCubesShader.getAttribLocation("position");
-    cube_attr_pos = cubeShader.getAttribLocation("position");
-
-    // set up vaos
-    glBindVertexArray(mcubes_vao);
-
-      glBindBuffer(GL_ARRAY_BUFFER, points_vbo);
-      glVertexAttribPointer(mcubes_attr_pos, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
-      glEnableVertexAttribArray(mcubes_attr_pos);
-      glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    glBindVertexArray(0);
-    glDisableVertexAttribArray(mcubes_attr_pos);
-
-    glBindVertexArray(cube_vao);
-
-      glBindBuffer(GL_ARRAY_BUFFER, points_vbo);
-      glVertexAttribPointer(cube_attr_pos, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
-      glEnableVertexAttribArray(cube_attr_pos);
-      glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    glBindVertexArray(0);
-    glDisableVertexAttribArray(cube_attr_pos);
+    chunkManager.init();
+    chunkManager.setSurface(surface);
 
     return 0;
 }
@@ -190,13 +114,32 @@ void MCubes::mainloop() {
     SDL_Event event;
     while(SDL_PollEvent(&event)) {
         switch(event.type) {
+        case SDL_MOUSEWHEEL:
+            surface += event.wheel.y;
+            surface += event.wheel.x * 100;
+            chunkManager.setSurface(surface);
+            break;
         case SDL_KEYDOWN:
             switch (event.key.keysym.sym) {
                 case SDLK_q:
                     running = false;
                     break;
                 case SDLK_r:
-                    mCubesShader.loadFromFile("shaders/mcubes.vert", "shaders/mcubes.geom", "shaders/mcubes.frag");
+                    chunkManager.reloadShaders();
+                    break;
+                case SDLK_UP:
+                    surface++;
+                    chunkManager.setSurface(surface);
+                    break;
+                case SDLK_DOWN:
+                    surface--;
+                    chunkManager.setSurface(surface);
+                    break;
+                case SDLK_LEFT:
+                    chunkManager.nextFunc(-1);
+                    break;
+                case SDLK_RIGHT:
+                    chunkManager.nextFunc();
                     break;
                 default:
                     break;

@@ -3,7 +3,7 @@
 #extension GL_OES_geometry_shader : enable
 #extension GL_EXT_gpu_shader4 : enable
 
-precision mediump float;
+precision highp float;
 
 layout(points) in;
 layout(triangle_strip, max_vertices = 12) out;
@@ -14,6 +14,7 @@ out vec3 pos;
 uniform mat4 MVP;
 uniform isampler2D triTable;
 uniform float surface;
+uniform int func;
 
 const vec3 cube[8] = vec3[8](
     vec3(0.0, 0.0, 1.0),
@@ -31,18 +32,40 @@ int getTriangulation(int i, int j) {
 }
 
 float f(vec3 position) {
-    const float resolution = 4.0;
-    // sum of elements
-    /* return dot(position * vec3(resolution * resolution, resolution, 1), vec3(1)); */
-    if ((position.x > 1.0) && (position.y > 1.0) && (position.z > 1.0)) {
-      return 5.0;
-    } else {
-      return -5.0;
+    vec3 p = position;
+
+    switch (func) {
+      case 0: // sphere
+        return (p.x * p.x + p.y * p.y + p.z * p.z) - 4096.0;
+        break;
+      case 1: // plane
+        return 3.0 * p.x + 4.0 * p.y - p.z - 5.0;
+        break;
+      case 2: // ripple
+        p *= 0.3;
+        return sin(length(p)) * p.x + sin(length(p)) * p.y;
+        break;
+      case 3: // hyperboloid
+        return (pow(p.x, 2.0) + pow(p.y, 2.0) - pow(p.z, 2.0)) * 0.025;
+        break;
+      case 4: // hyperbolic parabloid
+        return (pow(p.x, 2.0) - pow(p.y, 2.0) - p.z) * 0.025;
+        break;
+      case 5: // crazy laggy 
+        p *= 100.0;
+        return (sin(dot(p.xxy, p.yzz)) + sin(p.x * p.y) + sin(p.x * p.z)) * 1.0;
+        break;
+      default:
+        break;
     }
 }
 
 vec3 middle(vec3 a, vec3 b) {
-    return (a + b) / 2.0;
+    float fa = f(a);
+    float fb = f(b);
+    if (abs(fa - fb) < 0.00001 || abs(surface - fa) < 0.00001) return a;
+    if (abs(surface - fb) < 0.00001) return b;
+    return mix(a, b, (surface - fa) / (fb - fa));
 }
 
 int whichCase(vec3 position) {
@@ -67,7 +90,7 @@ void main() {
     if (c == 0 || c == 255) return;
     vec3 verts[12];
 
-    #define mkCase(i, ci, cj) verts[i] = _pos + middle(cube[ci], cube[cj]);
+    #define mkCase(i, ci, cj) verts[i] = middle(_pos + cube[ci], _pos + cube[cj]);
 
     mkCase(0,  0, 1)
     mkCase(1,  1, 2)
